@@ -1,11 +1,57 @@
 <template>
-  <button @click="onClick">+</button>
-  <div>{{ count }}</div>
+  <button @click="onStart">Start</button>
+  <button @click="onStop">Stop</button>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { MediaRecorder } from 'extendable-media-recorder'
 
-let count = ref(0)
-let onClick = () => count.value++
+let mediaRecorder = null
+let chunks = []
+
+let onStart = async () => {
+  const sampleRate = 16000
+  const period = 1000
+  const fileName = 'sample.wav'
+
+  try {
+    let mediaStream = await navigator.mediaDevices.getUserMedia({
+      audio: true
+    })
+
+    let audioContext = new AudioContext({ sampleRate })
+
+    let srcNode = new MediaStreamAudioSourceNode(audioContext, { mediaStream })
+    let destNode = new MediaStreamAudioDestinationNode(audioContext)
+
+    srcNode.connect(destNode)
+
+    mediaRecorder = new MediaRecorder(destNode.stream, {
+      mimeType: 'audio/wav'
+    })
+
+    mediaRecorder.ondataavailable = (e) => {
+      chunks.push(e.data)
+    }
+
+    mediaRecorder.onstop = () => {
+      let blob = new Blob(chunks)
+
+      let link = document.createElement('a')
+      link.href = URL.createObjectURL(blob)
+      link.download = fileName
+      link.click()
+
+      URL.revokeObjectURL(link.href)
+    }
+
+    mediaRecorder.start(period)
+  } catch (err) {
+    console.warn(err)
+  }
+}
+
+let onStop = () => {
+  mediaRecorder.stop()
+}
 </script>
